@@ -10,23 +10,11 @@ from auth import hash_password
 load_dotenv()
 
 def create_app():
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    instance_dir = os.path.join(basedir, 'instance')
-    os.makedirs(instance_dir, exist_ok=True)
-    uploads_dir = os.path.join(basedir, 'uploads')
-    os.makedirs(uploads_dir, exist_ok=True)
-
-    app = Flask(
-        __name__,
-        template_folder=os.path.join(basedir, 'templates'),
-        static_folder=os.path.join(basedir, 'static'),
-        instance_path=instance_dir
-    )
+    app = Flask(__name__, template_folder="templates", static_folder="static")
     
     # Configure Flask app
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-flask-secret-key')
-    db_file = os.path.join(instance_dir, 'attendance.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///attendance.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
     app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'default-jwt-secret-key')
@@ -41,15 +29,11 @@ def create_app():
     # Error handlers
     @app.errorhandler(404)
     def not_found_error(error):
-        if request.path.startswith('/api/'):
-            return jsonify(error="Resource not found"), 404
-        return render_template('layout.html'), 404
+        return jsonify(error="Not found"), 404
 
     @app.errorhandler(500)
     def internal_error(error):
-        if request.path.startswith('/api/'):
-            return jsonify(error="Internal server error"), 500
-        return "<h3>Internal Server Error</h3><p>An unexpected error occurred. Please refresh the page.</p>", 500
+        return jsonify(error="Internal server error"), 500
         
     with app.app_context():
         db.create_all()
@@ -204,7 +188,7 @@ def create_app():
             item=r.data[0]
             if getattr(item,"b64_json",None):
                 raw=base64.b64decode(item.b64_json)
-                name=f"{uuid.uuid4().hex}.png"; path=os.path.join(uploads_dir,name)
+                name=f"{uuid.uuid4().hex}.png"; path=os.path.join("uploads",name)
                 os.makedirs("uploads", exist_ok=True)
                 open(path,"wb").write(raw)
                 return jsonify(url=f"/uploads/{name}")
@@ -246,7 +230,7 @@ def create_app():
 
     @app.get("/uploads/<name>")
     def uploads(name): 
-        return send_file(os.path.join(uploads_dir,name))
+        return send_file(os.path.join("uploads",name))
 
     @app.get("/health")
     def health():
@@ -256,31 +240,33 @@ def create_app():
                        
     return app
 
-if __name__ == "__main__":
+app = create_app()
+
+
+if __name__ == '__main__':
     import socket
 
     def is_port_in_use(port_num):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(("127.0.0.1", port_num)) == 0
+            return s.connect_ex(('127.0.0.1', port_num)) == 0
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
-        target_port = int(os.environ.get("PORT", 5050))
-        if is_port_in_use(target_port):
-            for candidate in [5050, 5001, 8000, 8080]:
-                if not is_port_in_use(candidate):
-                    target_port = candidate
-                    break
-        os.environ["PORT"] = str(target_port)
-    else:
-        target_port = int(os.environ.get("PORT", 5050))
+    # Default to 5050 to prevent macOS AirPlay Receiver (port 5000) collision
+    target_port = int(os.environ.get('PORT', 5050))
 
-    app = create_app()
-    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
-        print()
-        print("=" * 65)
-        print("  CLASSROOM ATTENDANCE ASSISTANT IS LIVE!")
-        print(f"  Open in Browser: http://127.0.0.1:{target_port}/login")
-        print(f"  (Port {target_port} used to avoid macOS AirPlay Receiver conflicts)")
-        print("=" * 65)
-        print()
-    app.run(debug=True, host="127.0.0.1", port=target_port)
+    if is_port_in_use(target_port):
+        for candidate in [5050, 5001, 8000, 8080]:
+            if not is_port_in_use(candidate):
+                target_port = candidate
+                break
+
+    print("\n" + "=" * 65)
+    print("  CLASSROOM ATTENDANCE ASSISTANT IS LIVE!")
+    print(f"  Open in Browser: http://127.0.0.1:{target_port}/login")
+    print("  (Port used to avoid macOS AirPlay Receiver conflicts)")
+    print("=" * 65 + "\n")
+
+    app.run(
+        debug=True,
+        host='127.0.0.1',
+        port=target_port
+    )
