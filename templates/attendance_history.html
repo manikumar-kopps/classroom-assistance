@@ -1,0 +1,115 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h5 mb-1 fw-bold text-dark">
+            <i class="fas fa-history text-primary me-2"></i>Attendance History
+        </h2>
+        <p class="text-muted small mb-0">Search and audit all historical attendance records.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/api/reports/export/csv?type=daily" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <i class="fas fa-file-csv me-1"></i> Export CSV
+        </a>
+        <a href="/api/reports/export/pdf?type=daily" target="_blank" class="btn btn-outline-danger btn-sm shadow-sm">
+            <i class="fas fa-file-pdf me-1"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body bg-light p-3">
+        <form class="row g-2 align-items-end" method="GET">
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">From</label>
+                <input type="date" class="form-control form-control-sm" name="date_start" value="{{ request.args.get('date_start', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">To</label>
+                <input type="date" class="form-control form-control-sm" name="date_end" value="{{ request.args.get('date_end', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Class</label>
+                <select class="form-select form-select-sm" name="class">
+                    <option value="">All Classes</option>
+                    {% for c in classes %}
+                    <option value="{{ c.class_id }}" {% if request.args.get('class') == c.class_id|string %}selected{% endif %}>{{ c.class_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Subject</label>
+                <select class="form-select form-select-sm" name="subject_id">
+                    <option value="">All Subjects</option>
+                    {% for s in subjects %}
+                    <option value="{{ s.subject_id }}" {% if request.args.get('subject_id') == s.subject_id|string %}selected{% endif %}>{{ s.subject_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Status</label>
+                <select class="form-select form-select-sm" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="present" {% if request.args.get('status') == 'present' %}selected{% endif %}>Present</option>
+                    <option value="absent" {% if request.args.get('status') == 'absent' %}selected{% endif %}>Absent</option>
+                    <option value="late" {% if request.args.get('status') == 'late' %}selected{% endif %}>Late</option>
+                    <option value="excused" {% if request.args.get('status') == 'excused' %}selected{% endif %}>Excused</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter me-1"></i> Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Date</th>
+                        <th>Student</th>
+                        <th>Roll No</th>
+                        <th>Class</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Marked By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr>
+                        <td class="ps-3 fw-medium">{{ r.date }}</td>
+                        <td class="fw-bold text-dark">{{ r.name }}</td>
+                        <td><span class="badge bg-light text-dark border">{{ r.roll }}</span></td>
+                        <td>{{ r.class }}</td>
+                        <td>{{ r.subject }}</td>
+                        <td>
+                            {% if r.status == 'Present' %}<span class="badge bg-success">Present</span>
+                            {% elif r.status == 'Absent' %}<span class="badge bg-danger">Absent</span>
+                            {% elif r.status == 'Late' %}<span class="badge bg-warning text-dark">Late</span>
+                            {% else %}<span class="badge bg-info">Excused</span>{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ r.teacher }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fas fa-folder-open fa-2x mb-2 text-secondary opacity-50 d-block"></i>
+                            No attendance records found matching filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white border-top py-3 d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Total Records: {{ total | default(records|length) }}</span>
+            <span class="text-muted small">Page {{ page | default(1) }} of {{ total_pages | default(1) }}</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

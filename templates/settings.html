@@ -1,0 +1,66 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h4 mb-0 fw-bold">System Settings</h2>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+                <h6 class="fw-bold mb-0"><i class="fas fa-sliders-h me-2 text-primary"></i>Attendance Configuration</h6>
+            </div>
+            <div class="card-body p-4">
+                <form action="/admin/settings" method="POST">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small">Minimum Attendance Threshold (%)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="threshold" value="{{ settings.threshold | default(75) }}" min="0" max="100">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text">Students falling below this percentage will be flagged with low attendance alerts.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small">School/Institution Name</label>
+                        <input type="text" class="form-control" name="school_name" value="{{ settings.school_name | default('Modern Academy') }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+                <h6 class="fw-bold mb-0"><i class="fas fa-info-circle me-2 text-info"></i>System Information</h6>
+            </div>
+            <div class="card-body p-4">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                        <span class="text-muted">App Version</span>
+                        <span class="fw-medium">v1.2.0</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                        <span class="text-muted">Database Status</span>
+                        <span class="badge bg-success">Connected</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                        <span class="text-muted">AI Model Status</span>
+                        <span class="badge bg-success">Active</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                        <span class="text-muted">Last Backup</span>
+                        <span class="fw-medium">Today, 03:00 AM</span>
+                    </li>
+                </ul>
+                <div class="mt-4 pt-3 border-top">
+                    <button class="btn btn-outline-secondary btn-sm"><i class="fas fa-download me-2"></i>Download Logs</button>
+                    <button class="btn btn-outline-danger btn-sm ms-2"><i class="fas fa-sync me-2"></i>Clear Cache</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

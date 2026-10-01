@@ -1,0 +1,116 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<style>
+    .chat-container { height: calc(100vh - 200px); display: flex; flex-direction: column; background: #fff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1.5rem; }
+    .chat-input-area { padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+    .message { max-width: 80%; margin-bottom: 1rem; padding: 1rem; border-radius: 12px; line-height: 1.5; }
+    .msg-user { background: #3b82f6; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 2px; }
+    .msg-ai { background: #f1f5f9; color: #1e293b; align-self: flex-start; margin-right: auto; border-bottom-left-radius: 2px; }
+    .typing-indicator { display: none; padding: 1rem; color: #64748b; font-size: 0.9rem; }
+    .suggestion-btn { font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 20px; background: #e2e8f0; color: #475569; border: none; margin: 0.2rem; transition: background 0.2s; }
+    .suggestion-btn:hover { background: #cbd5e1; }
+</style>
+
+<div class="chat-container">
+    <div class="bg-primary text-white p-3 rounded-top d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-robot fa-lg me-3"></i>
+            <div>
+                <h6 class="mb-0 fw-bold">Microsoft Foundry AI Assistant</h6>
+                <small class="opacity-75">Role-based attendance intelligence powered by Azure OpenAI</small>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <span class="badge bg-white text-primary border"><i class="fas fa-microchip me-1"></i> gpt-4.1-mini</span>
+            <span class="badge bg-success border"><i class="fas fa-link me-1"></i> Foundry Linked</span>
+        </div>
+    </div>
+    
+    <div class="chat-messages" id="chatMessages">
+        <div class="message msg-ai shadow-sm">
+            Hello! I am your AI Attendance Assistant. How can I help you today?
+        </div>
+    </div>
+    
+    <div class="typing-indicator" id="typingIndicator">
+        <i class="fas fa-circle-notch fa-spin me-2"></i> AI is thinking...
+    </div>
+
+    <div class="px-3 pb-2 bg-light">
+        <div class="d-flex flex-wrap" id="suggestions">
+            {% if current_user.role == 'admin' %}
+            <button class="suggestion-btn" onclick="sendMsg('Give me a summary of this month\'s attendance')">This month's summary</button>
+            <button class="suggestion-btn" onclick="sendMsg('Which class has the lowest attendance?')">Lowest attendance class?</button>
+            {% elif current_user.role == 'teacher' %}
+            <button class="suggestion-btn" onclick="sendMsg('Which students have attendance below 75%?')">Students below 75%?</button>
+            <button class="suggestion-btn" onclick="sendMsg('Show attendance summary for today')">Today's summary</button>
+            {% else %}
+            <button class="suggestion-btn" onclick="sendMsg('What is my attendance percentage?')">My attendance %?</button>
+            <button class="suggestion-btn" onclick="sendMsg('Which subjects am I low in?')">Subjects I'm low in?</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <form id="chatForm" class="d-flex gap-2">
+            <input type="text" id="userInput" class="form-control rounded-pill px-4" placeholder="Type your message here..." autocomplete="off">
+            <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px;"><i class="fas fa-paper-plane"></i></button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('chatForm');
+    const input = document.getElementById('userInput');
+    const messages = document.getElementById('chatMessages');
+    const typing = document.getElementById('typingIndicator');
+
+    function appendMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `message shadow-sm ${sender === 'user' ? 'msg-user' : 'msg-ai'}`;
+        div.innerHTML = text; // allow basic html/markdown styling
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    window.sendMsg = function(text) {
+        input.value = text;
+        form.dispatchEvent(new Event('submit'));
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        input.value = '';
+        typing.style.display = 'block';
+
+        // Call backend /api/ai/chat
+        fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ question: text, message: text })
+        }).then(res => res.json())
+        .then(data => {
+            typing.style.display = 'none';
+            if (data.reply) {
+                appendMessage(data.reply, 'ai');
+            } else if (data.error) {
+                appendMessage('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.error + '</span>', 'ai');
+            } else {
+                appendMessage("Unable to generate response from attendance records.", 'ai');
+            }
+        })
+        .catch(err => {
+            typing.style.display = 'none';
+            appendMessage('<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Error connecting to AI Assistant service.</span>', 'ai');
+        });
+    });
+</script>
+{% endblock %}

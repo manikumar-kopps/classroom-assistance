@@ -1,0 +1,158 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 mb-0 fw-bold text-dark">Manage Classes</h2>
+        <p class="text-muted small mb-0">Create, edit, and organize classes and cohorts for attendance tracking.</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addClassModal">
+        <i class="fas fa-plus me-2"></i>Add Class
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="classesTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Class Name</th>
+                        <th>Semester/Year</th>
+                        <th>Department</th>
+                        <th>Students Enrolled</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in classes %}
+                    <tr>
+                        <td class="fw-semibold text-primary">
+                            <i class="fas fa-school me-2 text-muted"></i>{{ c.name }}
+                        </td>
+                        <td>Semester {{ c.sem }}</td>
+                        <td><span class="badge bg-light text-dark border">{{ c.dept }}</span></td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-users me-2 text-muted"></i>{{ c.count }} students
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditClass({{ c.id }}, '{{ c.name }}', '{{ c.sem }}', '{{ c.dept }}')" title="Edit Class">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="openDeleteClass({{ c.id }}, '{{ c.name }}')" title="Delete Class">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">No classes found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Class Modal -->
+<div class="modal fade" id="addClassModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Add New Class</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/admin/classes" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Class Name</label>
+                        <input type="text" class="form-control" name="name" required placeholder="e.g., MCA-A, MCA-B, BTech-CS">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Semester / Year</label>
+                        <input type="text" class="form-control" name="semester" placeholder="e.g., 1, 2, 3">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Department</label>
+                        <input type="text" class="form-control" name="department" placeholder="e.g., Computer Applications, IT">
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Class Modal -->
+<div class="modal fade" id="editClassModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Edit Class</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editClassForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Class Name</label>
+                        <input type="text" class="form-control" name="name" id="editClassName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Semester / Year</label>
+                        <input type="text" class="form-control" name="semester" id="editClassSem" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Department</label>
+                        <input type="text" class="form-control" name="department" id="editClassDept" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Class Modal -->
+<div class="modal fade" id="deleteClassModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                <h5 class="mb-2 fw-bold">Delete Class?</h5>
+                <p class="text-muted small mb-4" id="deleteClassPrompt">This will remove the class record.</p>
+                <form id="deleteClassForm" method="POST">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditClass(id, name, sem, dept) {
+    document.getElementById('editClassForm').action = `/admin/classes/${id}/edit`;
+    document.getElementById('editClassName').value = name;
+    document.getElementById('editClassSem').value = sem;
+    document.getElementById('editClassDept').value = dept;
+    new bootstrap.Modal(document.getElementById('editClassModal')).show();
+}
+
+function openDeleteClass(id, name) {
+    document.getElementById('deleteClassForm').action = `/admin/classes/${id}/delete`;
+    document.getElementById('deleteClassPrompt').innerText = `Are you sure you want to delete ${name}?`;
+    new bootstrap.Modal(document.getElementById('deleteClassModal')).show();
+}
+</script>
+{% endblock %}

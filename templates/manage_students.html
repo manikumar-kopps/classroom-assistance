@@ -1,0 +1,232 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 mb-0 fw-bold text-dark">Manage Students</h2>
+        <p class="text-muted small mb-0">Create students and assign cohorts. Newly added students appear automatically in teacher attendance rosters.</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+        <i class="fas fa-plus me-2"></i>Add Student
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="row mb-3 g-2">
+            <div class="col-md-3">
+                <select class="form-select form-select-sm" id="filterClass" onchange="filterStudents()">
+                    <option value="">All Classes</option>
+                    {% for c in classes %}
+                        <option value="{{ c.class_name }}">{{ c.class_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 ms-auto">
+                <input type="text" class="form-control form-control-sm" id="searchStudent" placeholder="Search by name, roll no..." onkeyup="filterStudents()">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="studentsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Roll No</th>
+                        <th>Student Name</th>
+                        <th>Email</th>
+                        <th>Class</th>
+                        <th>Department</th>
+                        <th>Attendance</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in students %}
+                    <tr data-class="{{ s.class }}">
+                        <td><span class="badge bg-light text-dark border fw-semibold">{{ s.roll }}</span></td>
+                        <td class="fw-semibold text-dark">{{ s.name }}</td>
+                        <td>{{ s.email }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary border">{{ s.class }}</span></td>
+                        <td>{{ s.dept }}</td>
+                        <td>
+                            {% set color = 'success' if s.att >= 85 else ('warning' if s.att >= 75 else 'danger') %}
+                            <span class="badge bg-{{ color }} text-white">{{ s.att }}%</span>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditStudent({{ s.id }}, '{{ s.roll }}', '{{ s.name }}', '{{ s.email }}', {{ s.class_id | default(1) }}, '{{ s.dept }}')" title="Edit Student">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="openDeleteStudent({{ s.id }}, '{{ s.name }}')" title="Delete Student">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No students found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal fade" id="addStudentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Add New Student</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/admin/students" method="POST">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Full Name</label>
+                            <input type="text" class="form-control" name="name" required placeholder="e.g., Alex Johnson">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Roll Number</label>
+                            <input type="text" class="form-control" name="roll_number" required placeholder="e.g., 2024MCA120">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Email Address</label>
+                        <input type="email" class="form-control" name="email" required placeholder="e.g., alex@school.edu">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Password</label>
+                        <input type="password" class="form-control" name="password" required placeholder="Login password">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Class</label>
+                            <select class="form-select" name="class_id" required>
+                                <option value="">Select Class...</option>
+                                {% for c in classes %}
+                                    <option value="{{ c.class_id if c.class_id is defined else c.id }}">{{ c.class_name if c.class_name is defined else c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Department</label>
+                            <input type="text" class="form-control" name="department" required placeholder="e.g., MCA">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Student Modal -->
+<div class="modal fade" id="editStudentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Edit Student</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editStudentForm" method="POST">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Full Name</label>
+                            <input type="text" class="form-control" name="name" id="editStudentName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Roll Number</label>
+                            <input type="text" class="form-control" name="roll_number" id="editStudentRoll" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Email Address</label>
+                        <input type="email" class="form-control" name="email" id="editStudentEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">New Password <small class="text-muted">(Leave blank to keep unchanged)</small></label>
+                        <input type="password" class="form-control" name="password" placeholder="Optional new password">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Class</label>
+                            <select class="form-select" name="class_id" id="editStudentClass" required>
+                                <option value="">Select Class...</option>
+                                {% for c in classes %}
+                                    <option value="{{ c.class_id if c.class_id is defined else c.id }}">{{ c.class_name if c.class_name is defined else c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-semibold">Department</label>
+                            <input type="text" class="form-control" name="department" id="editStudentDept" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Student Modal -->
+<div class="modal fade" id="deleteStudentModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                <h5 class="mb-2 fw-bold">Delete Student?</h5>
+                <p class="text-muted small mb-4" id="deleteStudentPrompt">This will remove the student record.</p>
+                <form id="deleteStudentForm" method="POST">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditStudent(id, roll, name, email, classId, dept) {
+    document.getElementById('editStudentForm').action = `/admin/students/${id}/edit`;
+    document.getElementById('editStudentRoll').value = roll;
+    document.getElementById('editStudentName').value = name;
+    document.getElementById('editStudentEmail').value = email;
+    if (classId) document.getElementById('editStudentClass').value = classId;
+    document.getElementById('editStudentDept').value = dept;
+    new bootstrap.Modal(document.getElementById('editStudentModal')).show();
+}
+
+function openDeleteStudent(id, name) {
+    document.getElementById('deleteStudentForm').action = `/admin/students/${id}/delete`;
+    document.getElementById('deleteStudentPrompt').innerText = `Are you sure you want to delete ${name}?`;
+    new bootstrap.Modal(document.getElementById('deleteStudentModal')).show();
+}
+
+function filterStudents() {
+    const classFilter = document.getElementById('filterClass').value.toLowerCase();
+    const searchFilter = document.getElementById('searchStudent').value.toLowerCase();
+    const rows = document.querySelectorAll('#studentsTable tbody tr');
+
+    rows.forEach(row => {
+        const rowClass = (row.getAttribute('data-class') || '').toLowerCase();
+        const rowText = row.innerText.toLowerCase();
+
+        const matchesClass = !classFilter || rowClass.includes(classFilter);
+        const matchesSearch = !searchFilter || rowText.includes(searchFilter);
+
+        row.style.display = (matchesClass && matchesSearch) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

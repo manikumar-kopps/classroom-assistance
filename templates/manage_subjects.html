@@ -1,0 +1,169 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 mb-0 fw-bold text-dark">Manage Subjects</h2>
+        <p class="text-muted small mb-0">Create subjects and assign teachers. Changes reflect immediately in teacher portals.</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+        <i class="fas fa-plus me-2"></i>Add Subject
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="subjectsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Code</th>
+                        <th>Subject Name</th>
+                        <th>Assigned Teacher</th>
+                        <th>Enrolled Students</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in subjects %}
+                    <tr>
+                        <td><span class="badge bg-light text-primary border fw-semibold">{{ s.code }}</span></td>
+                        <td class="fw-semibold text-dark">{{ s.name }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-chalkboard-teacher me-2 text-primary"></i>
+                                <span class="fw-medium">{{ s.teacher }}</span>
+                            </div>
+                        </td>
+                        <td>{{ s.enrolled }} students</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditSubject({{ s.id }}, '{{ s.code }}', '{{ s.name }}', '{{ s.teacher_id | default('') }}')" title="Edit Subject">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="openDeleteSubject({{ s.id }}, '{{ s.name }}')" title="Delete Subject">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">No subjects found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Add New Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/admin/subjects" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Subject Code</label>
+                        <input type="text" class="form-control" name="code" required placeholder="e.g., CS101, MCA201">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Subject Name</label>
+                        <input type="text" class="form-control" name="name" required placeholder="e.g., Python Programming, Cloud Computing">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Assign Teacher</label>
+                        <select class="form-select" name="teacher_id" required>
+                            <option value="">Select Teacher...</option>
+                            {% for teacher, user in teachers %}
+                                <option value="{{ teacher.teacher_id }}">{{ user.name }} ({{ teacher.department }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Subject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Subject Modal -->
+<div class="modal fade" id="editSubjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Edit Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editSubjectForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Subject Code</label>
+                        <input type="text" class="form-control" name="code" id="editSubjectCode" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Subject Name</label>
+                        <input type="text" class="form-control" name="name" id="editSubjectName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Assign Teacher</label>
+                        <select class="form-select" name="teacher_id" id="editSubjectTeacher" required>
+                            <option value="">Select Teacher...</option>
+                            {% for teacher, user in teachers %}
+                                <option value="{{ teacher.teacher_id }}">{{ user.name }} ({{ teacher.department }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Subject Modal -->
+<div class="modal fade" id="deleteSubjectModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                <h5 class="mb-2 fw-bold">Delete Subject?</h5>
+                <p class="text-muted small mb-4" id="deleteSubjectPrompt">This will remove the subject.</p>
+                <form id="deleteSubjectForm" method="POST">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditSubject(id, code, name, teacherId) {
+    document.getElementById('editSubjectForm').action = `/admin/subjects/${id}/edit`;
+    document.getElementById('editSubjectCode').value = code;
+    document.getElementById('editSubjectName').value = name;
+    if (teacherId) {
+        document.getElementById('editSubjectTeacher').value = teacherId;
+    }
+    new bootstrap.Modal(document.getElementById('editSubjectModal')).show();
+}
+
+function openDeleteSubject(id, name) {
+    document.getElementById('deleteSubjectForm').action = `/admin/subjects/${id}/delete`;
+    document.getElementById('deleteSubjectPrompt').innerText = `Are you sure you want to delete ${name}?`;
+    new bootstrap.Modal(document.getElementById('deleteSubjectModal')).show();
+}
+</script>
+{% endblock %}

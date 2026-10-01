@@ -1,0 +1,420 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h5 mb-1 fw-bold text-dark">
+            <i class="fas fa-chart-pie text-primary me-2"></i>Attendance Reports
+        </h2>
+        <p class="text-muted small mb-0">Generate, preview, and export official attendance reports by class, subject, and student.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm shadow-sm" onclick="exportReport('pdf')">
+            <i class="fas fa-file-pdf me-1"></i> Export PDF
+        </button>
+        <button type="button" class="btn btn-outline-success btn-sm shadow-sm" onclick="exportReport('csv')">
+            <i class="fas fa-file-excel me-1"></i> Export Excel (CSV)
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Filter Controls Column -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-3 pb-0">
+                <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-sliders-h text-primary me-2"></i>Report Criteria</h6>
+            </div>
+            <div class="card-body p-3">
+                <form id="reportForm" onsubmit="event.preventDefault(); generateReport();">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1">Report Type</label>
+                        <select class="form-select form-select-sm" id="reportType" onchange="generateReport()">
+                            <option value="class_summary" selected>Class Summary</option>
+                            <option value="subject_wise">Subject-wise Analysis</option>
+                            <option value="student_detailed">Student Detailed Roster</option>
+                            <option value="defaulters">Defaulters List (&lt; 75%)</option>
+                            <option value="daily">Detailed Daily Attendance Logs</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1">Class Filter</label>
+                        <select class="form-select form-select-sm" id="classFilter" onchange="generateReport()">
+                            <option value="all">All Classes</option>
+                            {% for c in classes %}
+                                <option value="{{ c.class_id }}">{{ c.class_name }} ({{ c.department }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1">Subject Filter</label>
+                        <select class="form-select form-select-sm" id="subjectFilter" onchange="generateReport()">
+                            <option value="all">All Subjects</option>
+                            {% for s in subjects %}
+                                <option value="{{ s.subject_id }}">{{ s.subject_name }} ({{ s.subject_code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1">Date Range</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="small text-muted" style="font-size: 0.75rem;">From</label>
+                                <input type="date" class="form-control form-control-sm" id="startDate" onchange="generateReport()">
+                            </div>
+                            <div class="col-6">
+                                <label class="small text-muted" style="font-size: 0.75rem;">To</label>
+                                <input type="date" class="form-control form-control-sm" id="endDate" onchange="generateReport()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 pt-2">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="generateReport()">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh Report Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Preview Area -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark" id="reportPreviewTitle">Report Preview</h6>
+                    <small class="text-muted" id="reportPreviewMeta">Live database results</small>
+                </div>
+                <div class="d-flex gap-2" id="kpiBadges">
+                    <span class="badge bg-light text-dark border" id="totalRecordsBadge">0 records</span>
+                </div>
+            </div>
+
+            <div class="card-body p-3">
+                <div id="previewContent">
+                    <div class="text-center py-5 text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                        <p class="small mb-0">Loading attendance data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date range: from 1st of current month to today
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+
+    document.getElementById('startDate').value = `${year}-${month}-01`;
+    document.getElementById('endDate').value = `${year}-${month}-${day}`;
+
+    // Auto-generate report preview on page load
+    generateReport();
+});
+
+function getFilterParams() {
+    const type = document.getElementById('reportType').value;
+    const classId = document.getElementById('classFilter').value;
+    const subjectId = document.getElementById('subjectFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    const params = new URLSearchParams();
+    params.set('type', type);
+    if (classId && classId !== 'all') params.set('class_id', classId);
+    if (subjectId && subjectId !== 'all') params.set('subject_id', subjectId);
+    if (startDate) params.set('date_from', startDate);
+    if (endDate) params.set('date_to', endDate);
+    return params;
+}
+
+function exportReport(format) {
+    const params = getFilterParams();
+    window.open(`/api/reports/export/${format}?${params.toString()}`, '_blank');
+}
+
+function generateReport() {
+    const preview = document.getElementById('previewContent');
+    const params = getFilterParams();
+    const reportType = document.getElementById('reportType').value;
+
+    preview.innerHTML = `
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+            <p class="small mb-0">Fetching live report data...</p>
+        </div>
+    `;
+
+    fetch(`/api/reports/generate?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+            renderReportData(reportType, data);
+        })
+        .catch(err => {
+            preview.innerHTML = `
+                <div class="alert alert-danger small py-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Failed to load report data: ${err.message}
+                </div>
+            `;
+        });
+}
+
+function renderReportData(type, data) {
+    const preview = document.getElementById('previewContent');
+    const title = document.getElementById('reportPreviewTitle');
+    const meta = document.getElementById('reportPreviewMeta');
+    const kpi = document.getElementById('kpiBadges');
+
+    const totalRecords = data.total_records || 0;
+    kpi.innerHTML = `<span class="badge bg-light text-dark border"><i class="fas fa-database me-1 text-primary"></i>${totalRecords} Total Records</span>`;
+
+    const getPctBadge = (pct) => {
+        if (pct >= 85) return `<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">${pct}%</span>`;
+        if (pct >= 75) return `<span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold">${pct}%</span>`;
+        return `<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">${pct}%</span>`;
+    };
+
+    if (type === 'class_summary') {
+        title.innerText = 'Class Summary Report';
+        meta.innerText = 'Overview of student count, sessions, and attendance percentages across classes';
+        const list = data.class_summary || [];
+
+        if (list.length === 0) {
+            preview.innerHTML = '<div class="text-center py-5 text-muted small">No class data found matching criteria.</div>';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Class Name</th>
+                            <th>Department</th>
+                            <th>Semester</th>
+                            <th>Enrolled</th>
+                            <th>Records</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th class="text-end">Avg Attendance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        list.forEach(item => {
+            html += `
+                <tr>
+                    <td class="fw-bold text-dark">${item.class_name}</td>
+                    <td>${item.department}</td>
+                    <td>Sem ${item.semester}</td>
+                    <td>${item.student_count}</td>
+                    <td>${item.total_records}</td>
+                    <td><span class="text-success fw-semibold">${item.present_count}</span></td>
+                    <td><span class="text-danger fw-semibold">${item.absent_count}</span></td>
+                    <td class="text-end">${getPctBadge(item.percentage)}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        preview.innerHTML = html;
+
+    } else if (type === 'subject_wise') {
+        title.innerText = 'Subject-wise Analysis Report';
+        meta.innerText = 'Performance, attendance rates, and faculty allocation per subject';
+        const list = data.subject_summary || [];
+
+        if (list.length === 0) {
+            preview.innerHTML = '<div class="text-center py-5 text-muted small">No subject data found matching criteria.</div>';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Code</th>
+                            <th>Subject Name</th>
+                            <th>Faculty / Teacher</th>
+                            <th>Records</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th class="text-end">Attendance Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        list.forEach(item => {
+            html += `
+                <tr>
+                    <td><span class="badge bg-light text-dark border">${item.subject_code}</span></td>
+                    <td class="fw-bold text-dark">${item.subject_name}</td>
+                    <td>${item.teacher}</td>
+                    <td>${item.total_records}</td>
+                    <td><span class="text-success fw-semibold">${item.present_count}</span></td>
+                    <td><span class="text-danger fw-semibold">${item.absent_count}</span></td>
+                    <td class="text-end">${getPctBadge(item.percentage)}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        preview.innerHTML = html;
+
+    } else if (type === 'student_detailed') {
+        title.innerText = 'Student Detailed Roster Report';
+        meta.innerText = 'Individual student attendance rates and participation';
+        const list = data.student_summary || [];
+
+        if (list.length === 0) {
+            preview.innerHTML = '<div class="text-center py-5 text-muted small">No student records found matching criteria.</div>';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Roll Number</th>
+                            <th>Class</th>
+                            <th>Department</th>
+                            <th>Total Sessions</th>
+                            <th>Attended</th>
+                            <th>Missed</th>
+                            <th class="text-end">Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        list.forEach(item => {
+            html += `
+                <tr>
+                    <td class="fw-bold text-dark">${item.student_name}</td>
+                    <td><span class="badge bg-light text-dark border">${item.roll_number}</span></td>
+                    <td>${item.class_name}</td>
+                    <td>${item.department}</td>
+                    <td>${item.total_records}</td>
+                    <td><span class="text-success fw-semibold">${item.present_count}</span></td>
+                    <td><span class="text-danger fw-semibold">${item.absent_count}</span></td>
+                    <td class="text-end">${getPctBadge(item.percentage)}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        preview.innerHTML = html;
+
+    } else if (type === 'defaulters') {
+        title.innerText = 'Defaulters Report (< 75% Attendance)';
+        meta.innerText = 'Students falling below the mandatory academic attendance threshold';
+        const list = data.defaulters || [];
+
+        if (list.length === 0) {
+            preview.innerHTML = `
+                <div class="text-center py-5 text-success small">
+                    <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                    <p class="mb-0 fw-semibold">No defaulters! All active students have attendance >= 75%.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <div class="alert alert-warning small py-2 mb-3 d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-2 text-warning"></i>
+                <span>Found <strong>${list.length} student(s)</strong> below the mandatory 75% threshold.</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Roll Number</th>
+                            <th>Class</th>
+                            <th>Sessions</th>
+                            <th>Attended</th>
+                            <th>Missed</th>
+                            <th>Status</th>
+                            <th class="text-end">Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        list.forEach(item => {
+            html += `
+                <tr>
+                    <td class="fw-bold text-dark">${item.student_name}</td>
+                    <td><span class="badge bg-light text-dark border">${item.roll_number}</span></td>
+                    <td>${item.class_name}</td>
+                    <td>${item.total_records}</td>
+                    <td><span class="text-success fw-semibold">${item.present_count}</span></td>
+                    <td><span class="text-danger fw-semibold">${item.absent_count}</span></td>
+                    <td><span class="badge bg-danger">Critical Alert</span></td>
+                    <td class="text-end">${getPctBadge(item.percentage)}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        preview.innerHTML = html;
+
+    } else { // daily attendance logs
+        title.innerText = 'Daily Attendance Logs';
+        meta.innerText = 'Chronological log of individual attendance records';
+        const list = data.records || [];
+
+        if (list.length === 0) {
+            preview.innerHTML = '<div class="text-center py-5 text-muted small">No daily attendance logs found matching criteria.</div>';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Student Name</th>
+                            <th>Roll Number</th>
+                            <th>Class</th>
+                            <th>Subject</th>
+                            <th class="text-end">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        list.slice(0, 50).forEach(item => {
+            const statusBadge = item.status === 'Present' ? '<span class="badge bg-success">Present</span>' :
+                               (item.status === 'Absent' ? '<span class="badge bg-danger">Absent</span>' :
+                               (item.status === 'Late' ? '<span class="badge bg-warning text-dark">Late</span>' : '<span class="badge bg-info">Excused</span>'));
+            html += `
+                <tr>
+                    <td>${item.date}</td>
+                    <td class="fw-bold text-dark">${item.student_name}</td>
+                    <td><span class="badge bg-light text-dark border">${item.roll_number}</span></td>
+                    <td>${item.class}</td>
+                    <td>${item.subject}</td>
+                    <td class="text-end">${statusBadge}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        if (list.length > 50) {
+            html += `<div class="p-2 text-center text-muted small border-top">Showing latest 50 of ${list.length} entries. Export to PDF/Excel for complete dataset.</div>`;
+        }
+        preview.innerHTML = html;
+    }
+}
+</script>
+{% endblock %}

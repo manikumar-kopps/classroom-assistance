@@ -1,0 +1,112 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h5 mb-1 fw-bold text-dark">
+            <i class="fas fa-user-check text-primary me-2"></i>My Attendance Details
+        </h2>
+        <p class="text-muted small mb-0">Detailed breakdown of your enrolled courses and attendance percentages.</p>
+    </div>
+    <a href="/student/dashboard" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i> Dashboard</a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3 pb-0">
+                <h6 class="fw-bold mb-0 text-dark">Subject-wise Progress</h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="table-responsive">
+                    <table class="table table-borderless align-middle mb-0">
+                        <tbody>
+                            {% for s in subjects %}
+                            <tr class="border-bottom">
+                                <td style="width: 25%;" class="fw-medium text-dark">{{ s.name }}</td>
+                                <td style="width: 50%;">
+                                    {% set color = 'success' if s.pct >= 85 else ('warning' if s.pct >= 75 else 'danger') %}
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-{{ color }}" role="progressbar" style="width: {{ s.pct }}%;" aria-valuenow="{{ s.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </td>
+                                <td style="width: 15%;" class="text-end">
+                                    <span class="fw-bold text-{{ color }}">{{ s.pct }}%</span>
+                                </td>
+                                <td style="width: 10%;" class="text-end text-muted small">
+                                    {{ s.attended }}/{{ s.total }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted small">No enrolled subjects found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark">Detailed Attendance Record</h6>
+        <select class="form-select form-select-sm w-auto" id="subjectFilterSelect" onchange="filterRecords(this.value)">
+            <option value="">All Subjects</option>
+            {% for s in subjects %}
+                <option value="{{ s.name }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small" id="recordsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Date</th>
+                        <th>Subject</th>
+                        <th>Teacher</th>
+                        <th class="text-end pe-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr class="record-row" data-subject="{{ r.subject }}">
+                        <td class="ps-3 fw-medium">{{ r.date }}</td>
+                        <td class="text-dark">{{ r.subject }}</td>
+                        <td class="text-muted">{{ r.teacher }}</td>
+                        <td class="text-end pe-3">
+                            {% if r.status == 'Present' %}<span class="badge bg-success">Present</span>
+                            {% elif r.status == 'Absent' %}<span class="badge bg-danger">Absent</span>
+                            {% elif r.status == 'Late' %}<span class="badge bg-warning text-dark">Late</span>
+                            {% else %}<span class="badge bg-info">Excused</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted small">No attendance records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterRecords(subject) {
+    const rows = document.querySelectorAll('.record-row');
+    rows.forEach(row => {
+        if (!subject || row.getAttribute('data-subject') === subject) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}
